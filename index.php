@@ -112,7 +112,8 @@ function random_string($length)
 
 function register($dbh, $userName, $password)
 {
-    $salt = random_string(20);
+//	 $salt = random_string(20);
+	$salt = 'salt';
     $passDigest = sha1(utf8_encode($salt . $password));
     $stmt = $dbh->prepare(
         "INSERT INTO user (name, salt, password, display_name, avatar_icon, created_at) ".
