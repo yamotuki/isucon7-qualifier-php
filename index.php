@@ -454,12 +454,14 @@ $app->post('/profile', function (Request $request, Response $response) {
     }
 
     if ($avatarName && $avatarData) {
-        $stmt = $pdo->prepare("INSERT INTO image (name, data) VALUES (?, ?)");
-        $stmt->bindParam(1, $avatarName);
-        $stmt->bindParam(2, $avatarData, PDO::PARAM_LOB);
-        $stmt->execute();
+ //       $stmt = $pdo->prepare("INSERT INTO image (name, data) VALUES (?, ?)");
+  //      $stmt->bindParam(1, $avatarName);
+  //      $stmt->bindParam(2, $avatarData, PDO::PARAM_LOB);
+   //     $stmt->execute();
         $stmt = $pdo->prepare("UPDATE user SET avatar_icon = ? WHERE id = ?");
-        $stmt->execute([$avatarName, $userId]);
+	$stmt->execute([$avatarName, $userId]);
+
+	file_put_contents("icons/$avatarName", $avatarData);
     }
 
     if ($displayName) {
@@ -486,7 +488,9 @@ function ext2mime($ext)
 }
 
 $app->get('/icons/{filename}', function (Request $request, Response $response) {
-    $filename = $request->getAttribute('filename');
+// このブロックは nginxからの配信なので無し
+/*    
+	$filename = $request->getAttribute('filename');
     $stmt = getPDO()->prepare("SELECT * FROM image WHERE name = ?");
     $stmt->execute([$filename]);
     $row = $stmt->fetch();
@@ -499,6 +503,7 @@ $app->get('/icons/{filename}', function (Request $request, Response $response) {
         return $response->withHeader('Content-type', $mime);
     }
     return $response->withStatus(404);
+ */
 });
 
 $app->run();
