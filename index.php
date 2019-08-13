@@ -461,7 +461,15 @@ $app->post('/profile', function (Request $request, Response $response) {
         $stmt = $pdo->prepare("UPDATE user SET avatar_icon = ? WHERE id = ?");
 	$stmt->execute([$avatarName, $userId]);
 
-	file_put_contents("icons/$avatarName", $avatarData);
+        $selectStmt = $pdo->prepare("SELECT avatar_icon FROM user WHERE id = ?");
+	$selectStmt->execute([$userId]);
+        $row = $selectStmt->fetch();
+	if (!is_null($row)) {
+		if ($row['avatar_icon'] !== $avatarName) file_put_contents("icons/$avatarName", $avatarData);
+	} else {
+		file_put_contents("icons/$avatarName", $avatarData);
+	}
+	
     }
 
     if ($displayName) {
