@@ -164,5 +164,32 @@ bind 127.0.0.1　（::1が入っているとip6見つけられなくてタイム
 ```
 コードを書き換えて、bench通る。めっちゃCPU不可落ちた。けどscore上がらない。コネクション数問題か。
 
+nginx の multi_accept on という設定がコメントアウトされていたので入れる。
+
+php fpm 設定のプロセス数が5で固定されていたので、20にとりあえず増やした。
+```
+$ grep max  /home/isucon/local/php/etc/isubata.php-fpm.conf
+pm.max_children = 20
+```
+```
+ 2482 isucon    20   0  348988  17520  10112 S   2.0  0.9   0:00.53 php-fpm
+ 2490 isucon    20   0  348988  17128   9720 S   2.0  0.8   0:00.55 php-fpm
+```
+1プロセスあたりの消費CPUとメモリがそれぞれ 2%と1% くらい。nginxだけならば50まで増やせそう。
+ここでbenchとってみると
+  "score": 43517,　とやっといいスコアがでた。
+プロセス数 60まで増やして
+  "score": 103859,
+2CPU, 2Gの適当なインスタンス設定してしまっているので、ここらで一回直して、複数インスタンス構成に変えることにする
+
+
+一応ネットワーク調査のコマンドもみておく
+```
+ sudo apt install vnstat
+```
+```
+ vnstat -l -i eth0
+```
+
 ここら辺参考にする
 https://blog.yuuk.io/entry/web-operations-isucon
