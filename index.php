@@ -63,11 +63,30 @@ $app->get('/initialize', function (Request $request, Response $response) {
     $dbh->query("DELETE FROM channel WHERE id > 10");
     $dbh->query("DELETE FROM message WHERE id > 10000");
     $dbh->query("DELETE FROM haveread");
+
+    $client = new Predis\Client([
+       'host'   => '127.0.0.1',
+       'port'   => 6379
+    ]);
+    $users = $dbh->query("SELECT name, password FROM user");
+    foreach ($users as $user) {
+        $client->set($user['name'], serialize($user));
+    }
+
     $response->withStatus(204);
 });
 
 function db_get_user($dbh, $userId)
 {
+    $client = new Predis\Client([
+       'host'   => '127.0.0.1',
+       'port'   => 6379,
+    ]);
+    $cached = $client->get($userId);
+    if ($cached) {
+	 return unserialize($cached);
+    }
+
     $stmt = $dbh->prepare("SELECT * FROM user WHERE id = ?");
     $stmt->execute([$userId]);
     return $stmt->fetch();
@@ -121,6 +140,13 @@ function register($dbh, $userName, $password)
     );
     $stmt->execute([$userName, $salt, $passDigest, $userName]);
     $stmt = $dbh->query("SELECT LAST_INSERT_ID() AS last_insert_id");
+
+    $client = new Predis\Client([
+       'host'   => '127.0.0.1',
+       'port'   => 6379,
+    ]);
+    $client->set($user['name'], serialize($user));
+
     return $stmt->fetch()['last_insert_id'];
 }
 

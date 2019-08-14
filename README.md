@@ -162,6 +162,7 @@ maxmemory 50mb
 supervised systemd
 bind 127.0.0.1　（::1が入っているとip6見つけられなくてタイムアウトする）
 ```
+コードを書き換えて、bench通る。めっちゃCPU不可落ちた。けどscore上がらない。コネクション数問題か。
 
 ここら辺参考にする
 https://blog.yuuk.io/entry/web-operations-isucon
