@@ -89,7 +89,11 @@ function db_get_user($dbh, $userId)
 
     $stmt = $dbh->prepare("SELECT * FROM user WHERE id = ?");
     $stmt->execute([$userId]);
-    return $stmt->fetch();
+
+    $user = $stmt->fetch();
+    $client->set($userId, serialize($user));
+
+    return $user;
 }
 
 function db_add_message($dbh, $channelId, $userId, $message)
@@ -141,13 +145,9 @@ function register($dbh, $userName, $password)
     $stmt->execute([$userName, $salt, $passDigest, $userName]);
     $stmt = $dbh->query("SELECT LAST_INSERT_ID() AS last_insert_id");
 
-    $client = new Predis\Client([
-       'host'   => '127.0.0.1',
-       'port'   => 6379,
-    ]);
-    $client->set($user['name'], serialize($user));
+    $userId = $stmt->fetch()['last_insert_id'];
 
-    return $stmt->fetch()['last_insert_id'];
+    return $userId;
 }
 
 $app->get('/', function (Request $request, Response $response) {
