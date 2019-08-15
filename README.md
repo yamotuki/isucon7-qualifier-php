@@ -44,7 +44,7 @@ isucon@iZ6we7qggdtabs3ysvx7mkZ:~/isubata/bench$ jq . < result.json  | grep score
  for name in `ls *.*` ; do convert $name -resize 100 ../icons/$name ; done
 ```
 
-cache control はnginx に画像の設定ブロックに以下の行を追加するだけ
+cache control はnginx に画像の設定ブロックに以下の行を追加するだけ。当時はCDNが外に挟まっていて、CacheControl publicがないときかないというところで足したチームが多かった見たい（ここら辺カンニングした）
 ```
 expires 30d;
 add_header Cache-Control public;
@@ -98,6 +98,8 @@ isucon@iZ6we7qggdtabs3ysvx7mkZ:~/isubata/webapp/php$ diff /etc/nginx/nginx.conf{
 ---
 > 	worker_connections 10000;
 ```
+
+ここら辺途中現実逃避。問題の本質から目を背けてMYSQLさらにみる。
 
 slow query log を入れる
 slow_query_log                = 1
@@ -175,21 +177,112 @@ pm.max_children = 20
  2482 isucon    20   0  348988  17520  10112 S   2.0  0.9   0:00.53 php-fpm
  2490 isucon    20   0  348988  17128   9720 S   2.0  0.8   0:00.55 php-fpm
 ```
-1プロセスあたりの消費CPUとメモリがそれぞれ 2%と1% くらい。nginxだけならば50まで増やせそう。
+1プロセスあたりの消費CPUとメモリがそれぞれ 2%と1.7% くらい。nginxだけならば40までは余裕を持って増やせそう。
 ここでbenchとってみると
   "score": 43517,　とやっといいスコアがでた。
-プロセス数 60まで増やして
-  "score": 103859,
-2CPU, 2Gの適当なインスタンス設定してしまっているので、ここらで一回直して、複数インスタンス構成に変えることにする
 
 
-一応ネットワーク調査のコマンドもみておく
+ここでDBのサーバを別に立ち上げ、構成変更を試す
+```
+apt update
+apt install git
+apt install ansible
+```
+site.ymlにcommonだけ入れて、/etc/ansible/hosts　に127.0.0.1を追加（必要ない気がするが何も書いてないとダメなのか？）
+```
+ansible-playbook site.yml --connection=local
+```
+isuconユーザが作られるので、移動して、
+`git clone https://github.com/isucon/isucon7-qualify.git isubata`
+こちらのユーザで、今度はsite.ymlにmysqlだけ入れて流し込み => table などはいらなかったので一回drop table。ちゃんと流し込む中身見た方が良い。
+元のサーバでmysqldump
+```
+ mysqldump -uisucon -p isubata > /tmp/mysql_dump_out
+ scp /tmp/mysql_dump_out root@47.245.57.148:/tmp/
+```
+dbサーバで
+```
+mysql -uisucon -p isubata < /tmp/mysql_dump_out
+```
+データ入ったので繋ぎ直し。
+なんか転送遅いなと思ったらGlobal回線使っていた！ 172.24.50.40 に接続すべし。 => 140Mb出てるやん・・・・
+webサーバのenv書き換えて再読み込みさせる
+```
+$ cat ~/env.sh
+ISUBATA_DB_HOST=172.24.50.40
+ISUBATA_DB_USER=isucon
+ISUBATA_DB_PASSWORD=isucon
+```
+dbサーバ側で、同じようにmysqld.cnf設定を変えて、
+```
+innodb_flush_log_at_trx_commit=2
+slow_query_log                = 1
+slow_query_log_file           = /var/log/mysql/mysqld-slow.log
+long_query_time               = 1
+log-queries-not-using-indexes = 1
+innodb_flush_method = O_DIRECT
+```
+bindのところをコメントアウトしておく。restartも忘れずに
+
+webサーバでmysqld潰しておく
+```
+isucon@iZ6we7qggdtabs3ysvx7mkZ:~/isubata/webapp/php$ sudo systemctl stop mysql
+isucon@iZ6we7qggdtabs3ysvx7mkZ:~/isubata/webapp/php$ sudo systemctl disabled  mysql
+Unknown operation disabled.
+isucon@iZ6we7qggdtabs3ysvx7mkZ:~/isubata/webapp/php$ sudo systemctl disable  mysql
+```
+良さそう。
+
+ここでbenchとってみるとCPUとメモリがちょっと空いているのでphpプロセスもうちょっと増やせそう
+%Cpu(s): 80.3 us, 14.3 sy,  0.0 ni,  0.0 id,  0.0 wa,  0.0 hi,  5.4 si,  0.0 st
+KiB Mem :  1009028 total,   376164 free,   402048 used,   230816 buff/cache
+
+ "score": 62462,
+
+
+ネットワーク調査のコマンドもここらでみておく
 ```
  sudo apt install vnstat
 ```
 ```
  vnstat -l -i eth0
 ```
+-l はライブのl。以下の値は scpでmysqldump_out を送り込んでいる時のもの。帯域が5Mb以下の指定なのでそれよりは出ているっぽい。
+```
+isucon@iZ6we7qggdtabs3ysvx7mkZ:~/isubata/bench$ vnstat  -l
+Monitoring eth0...    (press CTRL-C to stop)
 
-ここら辺参考にする
-https://blog.yuuk.io/entry/web-operations-isucon
+   rx:      173 kbit/s   302 p/s          tx:     6.98 Mbit/s   578 p/s
+```
+
+php fpm周りのチューニングをもうちょっと。
+unix sock で行けるようにするため、mkdir /var/run/php/ ; sudo chmod 777 /var/run/php/
+```
+listen = "/var/run/php/php-fpm.sock"
+```
+nginxの設定を、どっちが適用されているかまだわかっていないがとりあえず書き換え（あとでもうちょっと調べる）
+```
+        index index.php;
+        location / {
+               if (!-f $request_filename) {
+                       rewrite ^(.+)$ /index.php$1 last;
+               }
+                proxy_set_header Host $http_host;
+                proxy_pass http://unix:/var/run/php/php-fpm.sock;
+        }
+
+         location ~ [^/]\.php(/|$) {
+                 root           /home/isucon/isubata/webapp/php;
+                 include        fastcgi_params;
+                 fastcgi_index  index.php;
+                 fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                 fastcgi_param  SCRIPT_NAME     $fastcgi_script_name;
+                 fastcgi_pass   unix:/var/run/php/php-fpm.sock;
+        }
+```
+特にスコア変わらず。メモリ使用料などは？  1.7~1.9% くらい。あんまり変わってないな。unix socketで楽になるという説はよくわからん。調べよう。
+nginx自体はほとんどCPU, mem共に使っていない 3パーセント程度なので、これをMySQLと相乗りさせて2台Webサーバにする案良さそう。
+
+DB SlowLogで DELETE FROM haveread; がIndeｘ聞いていないよとなっていたので見てみることにする。
+
+
