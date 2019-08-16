@@ -15,6 +15,14 @@ date_default_timezone_set('Asia/Tokyo');
 define("TWIG_TEMPLATE_FOLDER", realpath(__DIR__) . "/views");
 define("AVATAR_MAX_SIZE", 1 * 1024 * 1024);
 
+function getRedis() 
+{
+    return new Predis\Client([
+       'host'   => '127.0.0.1',
+       'port'   => 6379
+    ]);
+}
+
 function getPDO()
 {
     static $pdo = null;
@@ -64,10 +72,7 @@ $app->get('/initialize', function (Request $request, Response $response) {
     $dbh->query("DELETE FROM message WHERE id > 10000");
     $dbh->query("DELETE FROM haveread");
 
-    $client = new Predis\Client([
-       'host'   => '127.0.0.1',
-       'port'   => 6379
-    ]);
+    $client = getRedis();
     $users = $dbh->query("SELECT name, password FROM user");
     foreach ($users as $user) {
 	    $client->set($user['name'], serialize($user));
@@ -79,10 +84,7 @@ $app->get('/initialize', function (Request $request, Response $response) {
 
 function db_get_user($dbh, $userId)
 {
-    $client = new Predis\Client([
-       'host'   => '127.0.0.1',
-       'port'   => 6379,
-    ]);
+    $client = getRedis();
     $cached = $client->get($userId);
     if ($cached) {
 	 return unserialize($cached);
@@ -406,10 +408,7 @@ $app->get('/profile/{user_name}', function (Request $request, Response $response
     list($channels, $_) = get_channel_list_info();
 
     #    $stmt = getPDO()->prepare("SELECT * FROM user WHERE name = ?");
-    $client = new Predis\Client([
-       'host'   => '127.0.0.1',
-       'port'   => 6379
-    ]);
+    $client = getRedis();
     $user = unserialize($client->get($userName));
 
     if (!$user) {
@@ -470,10 +469,7 @@ $app->post('/profile', function (Request $request, Response $response) {
     }
 
     // 変更した時には古い情報の削除
-    $client = new Predis\Client([
-       'host'   => '127.0.0.1',
-       'port'   => 6379
-    ]);
+    $client = getRedis();
     $client->set($user['id'], null);
     $client->set($user['name'], null);
 
