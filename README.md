@@ -321,6 +321,10 @@ KiB Mem :  1009028 total,   236780 free,   586904 used,   185344 buff/cache
 
 profile が slowなのでloadlevelをあげられないと言われているので、軽量化しようとキャッシュを挟んでみたが、あんまり影響なし。
 この遅いの get じゃなくて post だな多分・・・　というわけでpostのupdateを2回打っていたのをやめて1つにおまとめ。
+  "score": 70014,
+
+loginの無駄にselect * でとってしまっているのとLIMIT 1を追加して
+  "score": 71982,　（誤差か）
 
 slow pathと言われてしまっている history と message をもうちょいなんとかしてみるか count が遅いとかいう解説を見た。
 

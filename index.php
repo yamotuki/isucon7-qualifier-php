@@ -219,7 +219,7 @@ $app->get('/login', function (Request $request, Response $response) {
 $app->post('/login', function (Request $request, Response $response) {
     $name = $request->getParam('name');
     $password = $request->getParam('password');
-    $stmt = getPDO()->prepare("SELECT * FROM user WHERE name = ?");
+    $stmt = getPDO()->prepare("SELECT id, name, password, salt FROM user WHERE name = ? LIMIT 1");
     $stmt->execute([$name]);
     $user = $stmt->fetch();
     if (!$user || $user['password'] !== sha1(utf8_encode($user['salt'] . $password))) {
