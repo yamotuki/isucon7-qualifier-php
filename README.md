@@ -290,10 +290,36 @@ jsコードを読むと、ページ読み込み時に /message を読み込ん�
  "score": 66352,
 
 history が重いので直す。動線はなさそうなのだが、負荷を上げる判定に使っているっぽい。
+この二つのN+1を直したら劇的にMySQLの負荷がへり（CPU 0.3%, MEM25%）、これDBの構成分ける必要なかったのでは状態になった。
+core は69000くらい
+またもう一回撮ってみたら  "score": 84034 。
 
 
-DB SlowLogで DELETE FROM haveread; がIndeｘ聞いていないよとなっていたので見てみることにする。
+fetch と message のハックはやめて（解説読んだがfetch遅くするといいというはよくわからん）
+リソース使い切っていないのでnginx fpm のチューニングもうちょっとやってみる
+pm.max_requests = 10000 をfpm設定に入れる
 
+max children を 100まで増やしたが、意外と used が少ないように見える。CachedにはNginxのファイルくらいしかないのでもうちょっと減らしても良さそうか？
+KiB Mem :  1009028 total,    86336 free,   634444 used,   288248 buff/cache
+```
+$ du -h ../public/icons/
+25M	../public/icons/
+```
+かなり少ないので大丈夫。
+150まで増やして以下の感じ。
+KiB Mem :  1009028 total,    77296 free,   769048 used,   162684 buff/cache
+
+200まで増やして
+KiB Mem :  1009028 total,    65076 free,   886248 used,    57704 buff/cache
+流石にvim開くのも重くなってきた。
+
+  "score": 31195, スコア落ちたので攻めすぎた。CPUの方がサチっていたか？ 見逃した。
+100子だと
+%Cpu(s): 82.3 us, 12.8 sy,  0.0 ni,  0.0 id,  0.0 wa,  0.0 hi,  4.9 si,  0.0 st
+KiB Mem :  1009028 total,   236780 free,   586904 used,   185344 buff/cache
+こんなもんかなあ・・・
+
+slow pathと言われてしまっている history と message をもうちょいなんとかしてみるか count が遅いとかいう解説を見た。
 
 
 ここまでで考えたisucon戦略としてこうしたらいいのでは？ というやつ
