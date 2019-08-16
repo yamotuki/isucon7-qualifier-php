@@ -319,7 +319,11 @@ KiB Mem :  1009028 total,    65076 free,   886248 used,    57704 buff/cache
 KiB Mem :  1009028 total,   236780 free,   586904 used,   185344 buff/cache
 こんなもんかなあ・・・
 
+profile が slowなのでloadlevelをあげられないと言われているので、軽量化しようとキャッシュを挟んでみたが、あんまり影響なし。
+この遅いの get じゃなくて post だな多分・・・　というわけでpostのupdateを2回打っていたのをやめて1つにおまとめ。
+
 slow pathと言われてしまっている history と message をもうちょいなんとかしてみるか count が遅いとかいう解説を見た。
+
 
 
 ここまでで考えたisucon戦略としてこうしたらいいのでは？ というやつ

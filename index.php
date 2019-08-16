@@ -474,7 +474,7 @@ $app->post('/profile', function (Request $request, Response $response) {
     $client->set($user['name'], null);
 
     $displayName = $request->getParam('display_name');
-    $avatarName = null;
+    $avatarName = $user['avatar_name'];
     $avatarData = null;
 
     $uploadedFile = $request->getUploadedFiles()['avatar_icon'] ?? null;
@@ -498,13 +498,6 @@ $app->post('/profile', function (Request $request, Response $response) {
     }
 
     if ($avatarName && $avatarData) {
- //       $stmt = $pdo->prepare("INSERT INTO image (name, data) VALUES (?, ?)");
-  //      $stmt->bindParam(1, $avatarName);
-  //      $stmt->bindParam(2, $avatarData, PDO::PARAM_LOB);
-   //     $stmt->execute();
-        $stmt = $pdo->prepare("UPDATE user SET avatar_icon = ? WHERE id = ?");
-	$stmt->execute([$avatarName, $userId]);
-
         $selectStmt = $pdo->prepare("SELECT avatar_icon FROM user WHERE id = ?");
 	$selectStmt->execute([$userId]);
         $row = $selectStmt->fetch();
@@ -513,13 +506,10 @@ $app->post('/profile', function (Request $request, Response $response) {
 	} else {
 		file_put_contents("icons/$avatarName", $avatarData);
 	}
-	
     }
 
-    if ($displayName) {
-        $stmt = $pdo->prepare("UPDATE user SET display_name = ? WHERE id = ?");
-        $stmt->execute([$displayName, $userId]);
-    }
+    $stmt = $pdo->prepare("UPDATE user SET display_name = ? , avatar_icon = ?  WHERE id = ?");
+    $stmt->execute([$displayName, $avatarName, $userId]);
 
     return $response->withRedirect('/', 303);
 })->add($loginRequired);
