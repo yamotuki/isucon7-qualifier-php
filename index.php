@@ -70,7 +70,8 @@ $app->get('/initialize', function (Request $request, Response $response) {
     ]);
     $users = $dbh->query("SELECT name, password FROM user");
     foreach ($users as $user) {
-        $client->set($user['name'], serialize($user));
+	    $client->set($user['name'], serialize($user));
+	    $client->set($user['id'], serialize($user));
     }
 
     $response->withStatus(204);
@@ -92,6 +93,7 @@ function db_get_user($dbh, $userId)
 
     $user = $stmt->fetch();
     $client->set($userId, serialize($user));
+    $client->set($user['name'], serialize($user));
 
     return $user;
 }
@@ -403,9 +405,13 @@ $app->get('/profile/{user_name}', function (Request $request, Response $response
     $userName = $request->getAttribute('user_name');
     list($channels, $_) = get_channel_list_info();
 
-    $stmt = getPDO()->prepare("SELECT * FROM user WHERE name = ?");
-    $stmt->execute([$userName]);
-    $user = $stmt->fetch();
+    #    $stmt = getPDO()->prepare("SELECT * FROM user WHERE name = ?");
+    $client = new Predis\Client([
+       'host'   => '127.0.0.1',
+       'port'   => 6379
+    ]);
+    $user = unserialize($client->get($userName));
+
     if (!$user) {
         return $response->withStatus(404);
     }
@@ -456,11 +462,20 @@ $app->post('/profile', function (Request $request, Response $response) {
         return $response->withStatus(403);
     }
 
+
     $pdo = getPDO();
     $user = db_get_user($pdo, $userId);
     if (!$user) {
         return $response->withStatus(403);
     }
+
+    // 変更した時には古い情報の削除
+    $client = new Predis\Client([
+       'host'   => '127.0.0.1',
+       'port'   => 6379
+    ]);
+    $client->set($user['id'], null);
+    $client->set($user['name'], null);
 
     $displayName = $request->getParam('display_name');
     $avatarName = null;
