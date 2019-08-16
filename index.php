@@ -252,20 +252,24 @@ $app->get('/message', function (Request $request, Response $response) {
     $lastMessageId = $request->getParam('last_message_id');
     $dbh = getPDO();
     $stmt = $dbh->prepare(
-        "SELECT * ".
-        "FROM message ".
-        "WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100"
+        "SELECT message.id as message_id, user.id as user_id, channel_id, content, message.created_at as date, name, display_name, avatar_icon ".
+	"FROM message ".
+	"INNER JOIN user ON message.user_id = user.id ".
+        "WHERE message.id > ? AND message.channel_id = ? ORDER BY message.id DESC LIMIT 100"
     );
     $stmt->execute([$lastMessageId, $channelId]);
     $rows = $stmt->fetchall();
     $res = [];
     foreach ($rows as $row) {
         $r = [];
-        $r['id'] = (int)$row['id'];
-        $stmt = $dbh->prepare("SELECT name, display_name, avatar_icon FROM user WHERE id = ?");
-        $stmt->execute([$row['user_id']]);
-        $r['user'] = $stmt->fetch();
-        $r['date'] = str_replace('-', '/', $row['created_at']);
+        $r['id'] = (int)$row['message_id'];
+	$r['user'] = [
+		'id' => (int)$row['user_id'],
+		'name' => $row['name'],
+		'display_name' => $row['display_name'],
+		'avatar_icon' => $row['avatar_icon']
+	];
+        $r['date'] = str_replace('-', '/', $row['date']);
         $r['content'] = $row['content'];
         $res[] = $r;
     }
@@ -273,7 +277,7 @@ $app->get('/message', function (Request $request, Response $response) {
 
     $maxMessageId = 0;
     foreach ($rows as $row) {
-        $maxMessageId = max($maxMessageId, $row['id']);
+        $maxMessageId = max($maxMessageId, $row['message_id']);
     }
     $stmt = $dbh->prepare(
         "INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at) ".
@@ -358,21 +362,24 @@ $app->get('/history/{channel_id}', function (Request $request, Response $respons
 
     $offset = ($page - 1) * $pageSize;
     $stmt = $dbh->prepare(
-        "SELECT * ".
+        "SELECT message.id as message_id, user.id as user_id, channel_id, content, message.created_at as date, name, display_name, avatar_icon ".
         "FROM message ".
-        "WHERE channel_id = ? ORDER BY id DESC LIMIT $pageSize OFFSET $offset"
+        "INNER JOIN user ON message.user_id = user.id ".
+        "WHERE channel_id = ? ORDER BY message.id DESC LIMIT $pageSize OFFSET $offset"
     );
     $stmt->execute([$channelId]);
-
     $rows = $stmt->fetchall();
     $messages = [];
     foreach ($rows as $row) {
         $r = [];
-        $r['id'] = (int)$row['id'];
-        $stmt = $dbh->prepare("SELECT name, display_name, avatar_icon FROM user WHERE id = ?");
-        $stmt->execute([$row['user_id']]);
-        $r['user'] = $stmt->fetch();
-        $r['date'] = str_replace('-', '/', $row['created_at']);
+        $r['id'] = (int)$row['message_id'];
+        $r['user'] = [
+                'id' => (int)$row['user_id'],
+                'name' => $row['name'],
+                'display_name' => $row['display_name'],
+                'avatar_icon' => $row['avatar_icon']
+        ];
+        $r['date'] = str_replace('-', '/', $row['date']);
         $r['content'] = $row['content'];
         $messages[] = $r;
     }
