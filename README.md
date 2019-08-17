@@ -1,3 +1,10 @@
+途中まで webapp/php/ だけをgit管理において書き換えていたが、他のサーバに同内容をデプロイしたくなってきたので、全体をgit管理にする。
+続きは、 https://github.com/yamotuki/isucon7-qualifier
+
+
+------------------------------------
+
+
 初回bench score 4100 くらい。
 
 register の高速化をしたいのでパスワードのhash化ロジックを変更. random salt発行をなしに。
